@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Pokémon Red - Latest City, New City & Pallet City</title>
+    <style>
+        body {
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background: #000;
+            overflow: hidden;
+        }
+        canvas {
+            border: 1px solid #000;
+            max-width: 100vw;
+            max-height: 100vh;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas" width="1280" height="720"></canvas>
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Game constants
+        const TILE_SIZE = 40; // Size of a single tile in pixels
+        const MAP_WIDTH = 64; // Map width in tiles
+        
+        // City heights in tiles
+        const LATEST_CITY_HEIGHT = 36;
+        const NEW_CITY_HEIGHT = 36;
+        const PALLET_CITY_HEIGHT = 36; 
+        
+        // The total map height now includes the new city and two transition rows
+        const MAP_HEIGHT = LATEST_CITY_HEIGHT + 1 + NEW_CITY_HEIGHT + 1 + PALLET_CITY_HEIGHT;
+
+        // Total map dimensions in pixels
+        const MAP_PIXEL_WIDTH = MAP_WIDTH * TILE_SIZE;
+        const MAP_PIXEL_HEIGHT = MAP_HEIGHT * TILE_SIZE;
+
+        const PLAYER_SPEED = 2.5;
+        const NPC_SPEED = 1.5; // Slower speed for NPCs to make them look more natural
+        const ZOOM_FACTOR = TILE_SIZE === 20 ? 1 : 2.5; // Zoom if TILE_SIZE is not 20
+
+        // Load map images
+        const latestCityImage = new Image();
+        latestCityImage.src = 'latest_city_map.png';
+
+        const newCityImage = new Image();
+        newCityImage.src = 'new_city_map.png';
+        
+        const palletCityImage = new Image();
+        palletCityImage.src = 'pallet_city_map.png';
+
+        // Player movement sprites
+        const playerSprites = {
+            's': new Image(), // Down
+            'w': new Image(), // Up
+            'a': new Image(), // Left
+            'd': new Image()  // Right
+        };
+
+        playerSprites.s.src = 'players.png';
+        playerSprites.w.src = 'playerw.png';
+        playerSprites.a.src = 'playera.png';
+        playerSprites.d.src = 'playerd.png';
+
+        let currentPlayerSprite = playerSprites.s; // Default sprite
+
+        // NPC sprites
+        const npcSprites = [];
+        for (let i = 1; i <= 26; i++) {
+            const sprite = new Image();
+            sprite.src = `npc${i}.png`;
+            npcSprites.push(sprite);
+        }
+        
+        // --- LATEST CITY MAP DATA (Example: Duplicated Pallet City for demonstration) ---
+        const latestCityMapData = [
+            // Row 0 (Latest City)
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            // Row 1 (Latest City)
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            // Row 2 - Example building at (2,2) to (5,5) (Latest City)
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            // Row 3 (Latest City)
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            // Row 4 (Latest City)
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            // Row 5 (Latest City)
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            // Row 6 (Latest City)
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            // Row 7 - Another building example (Latest City)
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            // Row 8 (Latest City)
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            // Row 9 (Latest City)
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            // Row 10 (Latest City)
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            // Row 11 (Latest City)
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            // Row 12 (Latest City)
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            // Row 13 (Latest City)
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            // Row 14 (Latest City)
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,3,3,3,3,3,0,0,0,0,0,0,0,5],
+            // Row 15 (Latest City)
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            // Row 16 (Latest City)
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            // Row 17 (Latest City)
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            // Row 18 (Latest City)
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            // Row 19 (Latest City)
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            // Row 20 (Latest City)
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            // Row 21 (Latest City)
+            [5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5],
+            // Row 22 (Latest City)
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5],
+            // Row 23 (Latest City)
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5],
+            // Row 24 (Latest City)
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            // Row 25 (Latest City)
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            // Row 26 (Latest City)
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            // Row 27 (Latest City)
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            // Row 28 (Latest City)
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            // Row 29 (Latest City)
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            // Row 30 (Latest City)
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            // Row 31 (Latest City)
+            [0,0,5,3,3,3,0,0,3,3,3,5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5,5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5],
+            // Row 32 (Latest City)
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5],
+            // Row 33 (Latest City)
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5],
+            // Row 34 (Latest City)
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5],
+            // Row 35 (Latest City)
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5]
+        ];
+
+        // --- NEW CITY MAP DATA (Example: Duplicated Pallet City for demonstration) ---
+        const newCityMapData = [
+            // Row 0 (New City)
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            // Row 1 (New City)
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            // Row 2 - Example building at (2,2) to (5,5) (New City)
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            // Row 3 (New City)
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            // Row 4 (New City)
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            // Row 5 (New City)
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            // Row 6 (New City)
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            // Row 7 - Another building example (New City)
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            // Row 8 (New City)
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            // Row 9 (New City)
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            // Row 10 (New City)
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            // Row 11 (New City)
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            // Row 12 (New City)
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            // Row 13 (New City)
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            // Row 14 (New City)
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,3,3,3,3,3,0,0,0,0,0,0,0,5],
+            // Row 15 (New City)
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            // Row 16 (New City)
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            // Row 17 (New City)
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            // Row 18 (New City)
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            // Row 19 (New City)
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            // Row 20 (New City)
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            // Row 21 (New City)
+            [5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5],
+            // Row 22 (New City)
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5],
+            // Row 23 (New City)
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5],
+            // Row 24 (New City)
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            // Row 25 (New City)
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            // Row 26 (New City)
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            // Row 27 (New City)
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            // Row 28 (New City)
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            // Row 29 (New City)
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            // Row 30 (New City)
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            // Row 31 (New City)
+            [0,0,5,3,3,3,0,0,3,3,3,5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5,5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5],
+            // Row 32 (New City)
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5],
+            // Row 33 (New City)
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5],
+            // Row 34 (New City)
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5],
+            // Row 35 (New City)
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5]
+        ];
+
+        // --- PALLET CITY MAP DATA (Original) ---
+        const palletCityMapData = [
+            // Row 2 - Example building at (2,2) to (5,5) (Pallet City)
+            [5,5,0,5,5,5,0,0,0,0,0,0,0,3,3,3,3,3,3,0,0,0,0,0,0,3,3,3,3,3,3,3,3,0,6,6,0,0,0,0,0,0,0,0,0,0,0,0,4,0,0,0,0,0,0,3,3,3,3,3,3,3,0,0],
+            // Row 3 (Pallet City)
+            [5,5,0,5,0,0,0,0,0,3,3,3,3,3,3,3,3,3,3,3,3,3,0,0,0,3,3,3,3,3,3,3,3,0,6,6,0,0,0,0,0,0,0,0,0,0,0,0,4,0,0,0,0,0,0,3,3,3,3,3,3,3,0,0],
+            // Row 4 (Pallet City)
+            [5,5,0,5,0,0,0,0,0,3,3,3,3,3,3,3,3,3,3,3,3,3,0,0,0,3,3,3,3,3,3,3,3,0,6,6,0,0,0,3,3,3,3,3,3,3,3,0,4,0,0,0,0,0,0,3,3,3,3,0,0,3,0,0],
+            // Row 5 (Pallet City)
+            [5,5,0,0,0,0,0,0,0,3,3,3,3,3,3,3,3,3,3,3,3,3,0,0,0,3,3,3,3,3,3,3,3,0,6,6,0,0,0,3,3,3,3,3,3,3,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            // Row 6 (Pallet City)
+            [5,0,0,0,0,0,0,0,0,3,3,3,3,3,3,0,0,3,3,3,3,3,0,0,0,3,3,0,0,3,3,3,3,0,6,6,0,0,0,3,3,3,3,3,3,3,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            // Row 7 - Another building example (Pallet City)
+            [5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,6,6,0,0,0,3,3,0,0,3,3,3,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5],
+            // Row 8 (Pallet City)
+            [5,3,3,3,0,0,0,0,0,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,5],
+            // Row 9 (Pallet City)
+            [3,3,3,3,3,3,3,3,3,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,0,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,5],
+            // Row 10 (Pallet City)
+            [3,3,3,3,3,3,3,3,3,0,0,0,0,0,6,6,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,6,6,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,6,6,0,0,5],
+            // Row 11 (Pallet City)
+            [3,3,3,3,3,3,3,3,3,3,3,0,0,0,6,6,0,0,5,5,5,0,0,0,0,0,0,0,0,0,0,0,0,0,6,6,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,6,6,0,0,5],
+            // Row 12 (Pallet City)
+            [3,3,3,3,3,3,3,3,3,3,3,0,0,0,6,6,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,6,6,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,3,3,3,3,3,0,0,0,6,6,0,0,5],
+            // Row 13 (Pallet City)
+            [3,3,3,3,3,3,3,3,3,3,3,0,0,0,6,6,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,6,6,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,3,3,3,3,3,0,0,0,6,6,0,0,5],
+            // Row 14 (Pallet City)
+            [0,0,0,6,6,6,6,6,6,6,6,6,6,6,6,6,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,6,6,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,3,3,3,3,3,0,0,0,6,6,0,0,5],
+            // Row 15 (Pallet City)
+            [5,5,5,6,6,6,6,6,6,6,6,6,6,6,6,6,0,0,0,3,3,3,3,3,3,0,0,0,0,0,0,0,0,0,6,6,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,6,6,0,0,5],
+            // Row 16 (Pallet City)
+            [5,5,5,0,0,0,0,0,0,0,0,0,0,0,6,6,0,0,0,3,3,3,3,3,3,0,0,0,0,0,0,0,0,0,6,6,0,0,3,3,3,3,3,3,3,3,0,0,0,0,0,0,0,0,0,0,0,0,0,6,6,0,0,5],
+            // Row 17 (Pallet City)
+            [5,5,5,0,0,3,3,3,3,3,3,3,3,0,6,6,0,0,0,3,3,3,3,3,3,0,0,0,0,0,0,0,0,0,6,6,0,0,3,3,3,3,3,3,3,3,0,0,0,0,0,0,0,0,0,0,0,0,0,6,6,0,0,5],
+            // Row 18 (Player starts here) (Pallet City)
+            [5,5,5,0,0,3,3,3,3,3,3,3,3,0,6,6,0,0,3,0,0,3,3,3,3,0,0,0,0,0,0,0,0,0,6,6,0,0,3,3,3,3,3,3,3,3,0,0,0,0,0,0,0,0,0,0,0,0,0,6,6,0,0,5],
+            // Row 19 (Pallet City)
+            [5,0,0,0,0,0,0,3,3,3,3,3,3,0,6,6,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,6,6,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,6,6,0,0,5],
+            // Row 20 (Pallet City)
+            [5,0,0,0,0,3,3,3,0,0,3,3,3,0,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,5],
+            // Row 21 (Pallet City)
+            [5,0,0,0,0,0,0,0,0,0,0,0,0,0,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,5],
+            // Row 22 (Pallet City)
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,6,6,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,6,6,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5],
+            // Row 23 (Pallet City)
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,6,6,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,6,6,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5],
+            // Row 24 (Pallet City)
+            [0,0,5,5,0,0,0,0,0,0,0,5,5,0,6,6,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5,5,0,0,6,6,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,3,3,3,3,0,0,0,0,0,0,0,0,5],
+            // Row 25 (Pallet City)
+            [0,0,5,5,0,0,0,0,0,3,3,5,5,0,6,6,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5,5,5,0,6,6,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,3,3,3,3,0,0,0,0,0,0,0,0,5],
+            // Row 26 (Pallet City)
+            [0,5,5,3,3,3,3,3,3,3,3,5,5,0,6,6,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5,0,0,0,6,6,0,0,3,3,3,0,0,0,0,0,0,0,0,0,3,3,3,3,3,0,0,0,0,0,0,0,0,5],
+            // Row 27 (Pallet City)
+            [5,5,5,3,3,3,3,3,3,3,3,5,5,0,6,6,0,0,0,3,3,3,3,3,3,3,0,0,5,5,5,5,0,0,6,6,0,0,3,3,3,3,3,3,3,3,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5],
+            // Row 28 (Pallet City)
+            [5,5,5,3,3,3,3,3,3,3,3,5,5,0,6,6,0,0,0,3,3,3,3,3,3,3,0,0,5,5,5,5,0,0,6,6,0,0,3,3,3,3,3,3,3,3,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5],
+            // Row 29 (Pallet City)
+            [0,5,5,3,3,3,3,3,3,3,3,5,0,0,6,6,0,0,0,3,3,3,3,3,3,3,0,0,5,5,5,5,0,0,6,6,0,0,3,3,3,3,3,3,3,3,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5],
+            // Row 30 (Pallet City)
+            [0,5,5,3,3,3,3,3,3,3,3,5,0,0,6,6,0,0,0,3,3,3,0,0,3,3,0,0,0,5,5,0,0,0,6,6,0,0,3,0,0,3,3,3,3,3,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5],
+            // Row 31 (Pallet City)
+            [0,0,5,3,3,3,0,0,3,3,3,5,0,0,6,6,0,0,0,0,0,0,0,0,0,0,0,0,0,5,5,0,0,0,6,6,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5],
+            // Row 32 (Pallet City)
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,6,6,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,6,6,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5],
+            // Row 33 (Pallet City)
+            [0,0,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6],
+            // Row 34 (Pallet City)
+            [0,0,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6],
+            // Row 35 (Pallet City)
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5],
+            [5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5],
+            [5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5]
+        ];
+
+        // Add transition row between cities (grass path)
+        const transitionRow = Array(MAP_WIDTH).fill(0);
+        
+        // Combine the maps: Latest City, then transition, then New City, then transition, then Pallet City
+        const map = [...latestCityMapData, transitionRow, ...newCityMapData, transitionRow, ...palletCityMapData];
+
+        // Player object
+        const player = {
+            x: 10 * TILE_SIZE, // Start at x = 10 tiles (400 pixels)
+            y: (LATEST_CITY_HEIGHT + 1 + NEW_CITY_HEIGHT + 1 + 30) * TILE_SIZE, // Row 34 of Pallet City
+            width: TILE_SIZE * 1.6,
+            height: TILE_SIZE * 2.2,
+            speed: PLAYER_SPEED,
+            animationFrame: 0,
+            animationSpeed: 0.4,
+            animationOffset: 0,
+            isJumping: false,
+            jumpVelocity: 0,
+            groundY: (LATEST_CITY_HEIGHT + 1 + NEW_CITY_HEIGHT + 1 + 34) * TILE_SIZE // Set groundY to match starting y
+        };
+
+        // Camera object
+        const camera = {
+            x: 0,
+            y: 0,
+            zoom: ZOOM_FACTOR
+        };
+
+        // Collision tiles (cannot walk on these)
+        const collisionTiles = [2, 3, 4, 5, 7]; // Example: Water, Buildings, Fences, Trees, Tall Buildings
+        
+        // Pallet City's map offset
+        const PALLET_CITY_Y_OFFSET = (LATEST_CITY_HEIGHT + 1 + NEW_CITY_HEIGHT + 1);
+        
+        // Array to hold NPC objects
+        const npcs = [];
+        const numNpcs = 26;
+        const directions = ['w', 's', 'a', 'd'];
+
+        // Function to get a random valid spawn position for NPCs
+        function getRandomValidNpcPosition() {
+            let startX, startY, tileX, tileY;
+            let attempts = 0;
+            const maxAttempts = 100; // Prevent infinite loops
+
+            do {
+                startX = (Math.random() * (MAP_WIDTH - 2) + 1) * TILE_SIZE;
+                startY = (Math.random() * (PALLET_CITY_HEIGHT - 2) + 1) * TILE_SIZE + (PALLET_CITY_Y_OFFSET * TILE_SIZE);
+
+                // Convert proposed pixel coordinates to tile coordinates
+                tileX = Math.floor(startX / TILE_SIZE);
+                tileY = Math.floor(startY / TILE_SIZE);
+
+                attempts++;
+                if (attempts > maxAttempts) {
+                    console.warn("Could not find a valid spawn position for NPC after many attempts. Spawning anyway.");
+                    break;
+                }
+            } while (checkCollisionPoint(startX, startY) || 
+                     checkCollisionPoint(startX + TILE_SIZE * 1.6 - 0.1, startY) ||
+                     checkCollisionPoint(startX, startY + TILE_SIZE * 2.2 - 0.1) ||
+                     checkCollisionPoint(startX + TILE_SIZE * 1.6 - 0.1, startY + TILE_SIZE * 2.2 - 0.1)); // Check all corners
+
+            return { x: startX, y: startY };
+        }
+
+
+        for (let i = 0; i < numNpcs; i++) {
+            const { x: startX, y: startY } = getRandomValidNpcPosition();
+
+            // Create NPC object with a randomized starting position and direction
+            const npc = {
+                x: startX,
+                y: startY,
+                width: TILE_SIZE * 1.6,
+                height: TILE_SIZE * 2.2,
+                speed: NPC_SPEED,
+                sprite: npcSprites[i],
+                direction: directions[Math.floor(Math.random() * directions.length)],
+                animationFrame: 0,
+                animationSpeed: 0.4,
+                animationOffset: 0,
+                pathingTime: 0,
+                pathingMaxTime: Math.floor(Math.random() * 120) + 60 // Change direction every 1-2 seconds (60 frames per second)
+            };
+            npcs.push(npc);
+        }
+
+        // Keyboard controls
+        const keys = { 
+            w: false, W: false, // For 'w' and 'W'
+            s: false, S: false, // For 's' and 'S'
+            a: false, A: false, // For 'a' and 'A'
+            d: false, D: false, // For 'd' and 'D'
+            ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false,
+            ' ': false // Spacebar for jump
+        };
+
+        document.addEventListener('keydown', (e) => {
+            if (keys.hasOwnProperty(e.key)) keys[e.key] = true;
+        });
+
+        document.addEventListener('keyup', (e) => {
+            if (keys.hasOwnProperty(e.key)) keys[e.key] = false;
+        });
+
+        // Check collision for a single point (pixel coordinates)
+        function checkCollisionPoint(x, y) {
+            // Check if the point is outside the absolute map pixel boundaries
+            if (x < 0 || x >= MAP_PIXEL_WIDTH || y < 0 || y >= MAP_PIXEL_HEIGHT) {
+                return true; // Point is outside the map, consider it a collision
+            }
+
+            // Convert pixel coordinates to tile coordinates
+            const tileX = Math.floor(x / TILE_SIZE);
+            const tileY = Math.floor(y / TILE_SIZE);
+
+            // Ensure tile coordinates are within the map array bounds
+            if (tileY < 0 || tileY >= MAP_HEIGHT || tileX < 0 || tileX >= MAP_WIDTH) {
+                // This case should ideally be caught by the pixel boundary check above,
+                // but it's a good safeguard for unexpected floating point issues.
+                return true;
+            }
+
+            // Check if the tile at these coordinates is a collision tile
+            return collisionTiles.includes(map[tileY][tileX]);
+        }
+        
+        // Generic collision check function for any character (player or NPC)
+        function checkCharacterCollision(character, dx, dy) {
+            const epsilon = 0.1;
+            const newX = character.x + dx;
+            const newY = character.y + dy;
+            
+            // Check corners for collision
+            const collidesTL = checkCollisionPoint(newX, newY);
+            const collidesTR = checkCollisionPoint(newX + character.width - epsilon, newY);
+            const collidesBL = checkCollisionPoint(newX, newY + character.height - epsilon);
+            const collidesBR = checkCollisionPoint(newX + character.width - epsilon, newY + character.height - epsilon);
+            
+            // Check if any of the corners collide with a map collision tile
+            if (dx !== 0 && (collidesTL || collidesTR || collidesBL || collidesBR)) {
+                return true;
+            }
+            if (dy !== 0 && (collidesTL || collidesTR || collidesBL || collidesBR)) {
+                return true;
+            }
+            return false;
+        }
+
+        // Update player position
+        function updatePlayer() {
+            let dx = 0;
+            let dy = 0;
+            let isMoving = false;
+
+            if (keys.ArrowUp || keys.w || keys.W) {
+                dy = -player.speed;
+                currentPlayerSprite = playerSprites.w;
+                isMoving = true;
+            }
+            if (keys.ArrowDown || keys.s || keys.S) {
+                dy = player.speed;
+                currentPlayerSprite = playerSprites.s;
+                isMoving = true;
+            }
+            if (keys.ArrowLeft || keys.a || keys.A) {
+                dx = -player.speed;
+                currentPlayerSprite = playerSprites.a;
+                isMoving = true;
+            }
+            if (keys.ArrowRight || keys.d || keys.D) {
+                dx = player.speed;
+                currentPlayerSprite = playerSprites.d;
+                isMoving = true;
+            }
+
+            // Jump logic
+            if (keys[' '] && !player.isJumping) {
+                player.isJumping = true;
+                player.jumpVelocity = -10; // Initial jump velocity (upwards)
+                player.groundY = player.y; // Store current Y as ground level for this jump
+            }
+
+            if (player.isJumping) {
+                player.y += player.jumpVelocity;
+                player.jumpVelocity += 0.5; // Apply gravity
+
+                // If player lands back on or below groundY
+                if (player.y >= player.groundY) {
+                    player.y = player.groundY; // Snap to ground
+                    player.isJumping = false;
+                    player.jumpVelocity = 0;
+                }
+            }
+
+
+            // Update animation frame if moving (only horizontal movement affects bobbing)
+            if (isMoving && !player.isJumping) { // Only bob if not jumping
+                player.animationFrame += player.animationSpeed;
+                // Use Math.sin for a smooth up and down motion
+                // The 2 here controls the amplitude (how much it moves up/down)
+                // The 0.5 controls the frequency (how fast it bobs)
+                player.animationOffset = Math.sin(player.animationFrame) * 2; 
+            } else if (!player.isJumping) { // Reset animation when not moving and not jumping
+                player.animationFrame = 0;
+                player.animationOffset = 0;
+            }
+
+            let newX = player.x + dx;
+            let newY = player.y + dy; // This newY is for horizontal/vertical movement, not jump
+
+            // --- Collision detection for movement ---
+            // Only apply collision for horizontal/vertical movement, not jump
+            if (!player.isJumping) {
+                const epsilon = 0.1; 
+
+                // Check corners for collision
+                const collidesTL = checkCollisionPoint(newX, newY);
+                const collidesTR = checkCollisionPoint(newX + player.width - epsilon, newY);
+                const collidesBL = checkCollisionPoint(newX, newY + player.height - epsilon);
+                const collidesBR = checkCollisionPoint(newX + player.width - epsilon, newY + player.height - epsilon);
+
+                // If moving horizontally (dx != 0)
+                if (dx !== 0) {
+                    const willCollideX = (collidesTL || collidesBL) || (collidesTR || collidesBR);
+                    if (!willCollideX) {
+                        player.x = newX;
+                    }
+                }
+
+                // If moving vertically (dy != 0)
+                if (dy !== 0) {
+                    const willCollideY = (collidesTL || collidesTR) || (collidesBL || collidesBR);
+                    if (!willCollideY) {
+                        player.y = newY;
+                    }
+                }
+            } else {
+                // If jumping, still allow horizontal movement
+                player.x = newX;
+            }
+
+
+            // --- Absolute map boundary clamping for the player ---
+            player.x = Math.max(0, Math.min(player.x, MAP_PIXEL_WIDTH - player.width));
+            
+            // Check for city transition
+            const latestToNewY = LATEST_CITY_HEIGHT * TILE_SIZE;
+            const newToPalletY = (LATEST_CITY_HEIGHT + 1 + NEW_CITY_HEIGHT) * TILE_SIZE;
+
+            if (player.y < latestToNewY - player.height) {
+                // Player is in latest city
+            } else if (player.y > latestToNewY && player.y < newToPalletY - player.height) {
+                // Player is in new city
+            } else if (player.y > newToPalletY) {
+                // Player is in pallet city
+            }
+
+            // Player's Y is clamped to the groundY when not jumping, otherwise it's handled by jump logic
+            if (!player.isJumping) {
+                player.y = Math.max(0, Math.min(player.y, MAP_PIXEL_HEIGHT - player.height));
+            }
+        }
+        
+        // Update NPC positions
+        function updateNPCs() {
+            const directionsMap = {
+                'w': { dx: 0, dy: -NPC_SPEED },
+                's': { dx: 0, dy: NPC_SPEED },
+                'a': { dx: -NPC_SPEED, dy: 0 },
+                'd': { dx: NPC_SPEED, dy: 0 }
+            };
+
+            for (const npc of npcs) {
+                // Check if it's time to change direction
+                npc.pathingTime++;
+                if (npc.pathingTime >= npc.pathingMaxTime) {
+                    // Choose a new random direction
+                    const newDirection = directions[Math.floor(Math.random() * directions.length)];
+                    npc.direction = newDirection;
+                    // Reset pathing timer and set a new random max time
+                    npc.pathingTime = 0;
+                    npc.pathingMaxTime = Math.floor(Math.random() * 120) + 60;
+                }
+
+                const { dx, dy } = directionsMap[npc.direction];
+                const newX = npc.x + dx;
+                const newY = npc.y + dy;
+
+                // Check for collision with map tiles
+                const willCollide = checkCharacterCollision(npc, dx, dy);
+                if (!willCollide) {
+                    npc.x = newX;
+                    npc.y = newY;
+                } else {
+                    // If a collision is imminent, change direction immediately
+                    npc.direction = directions[Math.floor(Math.random() * directions.length)];
+                    npc.pathingTime = 0;
+                    npc.pathingMaxTime = Math.floor(Math.random() * 120) + 60;
+                }
+                
+                // Keep NPCs within the Pallet City boundaries
+                const palletCityMinY = (PALLET_CITY_Y_OFFSET + 1) * TILE_SIZE;
+                const palletCityMaxY = MAP_PIXEL_HEIGHT - npc.height;
+
+                if (npc.y < palletCityMinY || npc.y > palletCityMaxY || npc.x < 0 || npc.x > MAP_PIXEL_WIDTH - npc.width) {
+                    // If an NPC goes out of bounds, snap them back to a random valid location in Pallet City
+                    const { x: respawnX, y: respawnY } = getRandomValidNpcPosition();
+                    npc.x = respawnX;
+                    npc.y = respawnY;
+                    npc.direction = directions[Math.floor(Math.random() * directions.length)];
+                }
+
+                // Update animation frame based on movement
+                if (dx !== 0 || dy !== 0) {
+                    npc.animationFrame += npc.animationSpeed;
+                    npc.animationOffset = Math.sin(npc.animationFrame) * 2;
+                } else {
+                    npc.animationFrame = 0;
+                    npc.animationOffset = 0;
+                }
+            }
+        }
+
+        // Update camera to follow player
+        function updateCamera() {
+            const playerCenterX = player.x + player.width / 2;
+            const playerCenterY = player.y + player.height / 2;
+
+            const scaledCanvasWidth = canvas.width / camera.zoom;
+            const scaledCanvasHeight = canvas.height / camera.zoom;
+
+            camera.x = playerCenterX - scaledCanvasWidth / 2;
+            camera.y = playerCenterY - scaledCanvasHeight / 2;
+
+            const maxCameraX = MAP_PIXEL_WIDTH - scaledCanvasWidth;
+            const maxCameraY = MAP_PIXEL_HEIGHT - scaledCanvasHeight;
+
+            if (maxCameraX <= 0) {
+                camera.x = (MAP_PIXEL_WIDTH - scaledCanvasWidth) / 2;
+            } else {
+                camera.x = Math.max(0, Math.min(camera.x, maxCameraX));
+            }
+
+            if (maxCameraY <= 0) {
+                camera.y = (MAP_PIXEL_HEIGHT - scaledCanvasHeight) / 2;
+            } else {
+                camera.y = Math.max(0, Math.min(camera.y, maxCameraY));
+            }
+        }
+
+        // Draw the map
+        function drawMap() {
+            ctx.save();
+            ctx.scale(camera.zoom, camera.zoom);
+            ctx.translate(-camera.x, -camera.y);
+            
+            // Draw latest city (top section)
+            ctx.drawImage(latestCityImage, 0, 0, MAP_PIXEL_WIDTH, LATEST_CITY_HEIGHT * TILE_SIZE);
+            
+            // Draw new city directly after the latest city
+            ctx.drawImage(newCityImage, 0, LATEST_CITY_HEIGHT * TILE_SIZE, 
+                            MAP_PIXEL_WIDTH, NEW_CITY_HEIGHT * TILE_SIZE);
+            
+            // Draw pallet city directly after the new city
+            ctx.drawImage(palletCityImage, 0, (LATEST_CITY_HEIGHT + NEW_CITY_HEIGHT) * TILE_SIZE, 
+                            MAP_PIXEL_WIDTH, PALLET_CITY_HEIGHT * TILE_SIZE);
+            
+            ctx.restore();
+        }
+
+        // Draw the player
+        function drawPlayer() {
+            ctx.save();
+            ctx.scale(camera.zoom, camera.zoom);
+            ctx.translate(-camera.x, -camera.y);
+            // Apply the animation offset to the player's Y position when drawing
+            ctx.drawImage(currentPlayerSprite, player.x, player.y + player.animationOffset, player.width, player.height);
+            ctx.strokeStyle = 'transparent';
+            ctx.lineWidth = 1 / camera.zoom;
+            ctx.strokeRect(player.x, player.y + player.animationOffset, player.width, player.height);
+            ctx.restore();
+        }
+        
+        // Draw the NPCs
+        function drawNPCs() {
+            ctx.save();
+            ctx.scale(camera.zoom, camera.zoom);
+            ctx.translate(-camera.x, -camera.y);
+            
+            for (const npc of npcs) {
+                // Apply the animation offset to the NPC's Y position when drawing
+                ctx.drawImage(npc.sprite, npc.x, npc.y + npc.animationOffset, npc.width, npc.height);
+            }
+            ctx.restore();
+        }
+
+        // Game loop
+        function gameLoop() {
+            updatePlayer();
+            updateNPCs();
+            updateCamera();
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawMap();
+            drawPlayer();
+            drawNPCs();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Load all assets before starting the game loop
+        let assetsLoaded = 0;
+        const totalAssets = 3 + Object.keys(playerSprites).length + npcSprites.length; // 3 map images + 4 player sprites + 14 npc sprites
+
+        function assetLoaded() {
+            assetsLoaded++;
+            if (assetsLoaded === totalAssets) {
+                gameLoop();
+            }
+        }
+
+        latestCityImage.onload = assetLoaded;
+        latestCityImage.onerror = () => {
+            console.error("Failed to load latest city map image");
+            assetLoaded();
+        };
+
+        newCityImage.onload = assetLoaded;
+        newCityImage.onerror = () => {
+            console.error("Failed to load new city map image");
+            assetLoaded();
+        };
+
+        palletCityImage.onload = assetLoaded;
+        palletCityImage.onerror = () => {
+            console.error("Failed to load pallet city map image");
+            assetLoaded();
+        };
+
+        for (const key in playerSprites) {
+            playerSprites[key].onload = assetLoaded;
+            playerSprites[key].onerror = () => {
+                console.error(`Failed to load player sprite: ${playerSprites[key].src}`);
+                assetLoaded(); // Still call assetLoaded to proceed even if one asset fails
+            };
+        }
+        
+        for (const npc of npcSprites) {
+            npc.onload = assetLoaded;
+            npc.onerror = () => {
+                console.error(`Failed to load NPC sprite: ${npc.src}`);
+                assetLoaded();
+            };
+        }
+    </script>
+</body>
+</html>
