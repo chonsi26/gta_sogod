@@ -202,102 +202,10 @@
             padding: 6px 14px; border-radius: 8px; border: 1px solid #FFD700;
             pointer-events: none; z-index: 50; opacity: 0.75;
         }
-
-        /* ── Mobile Touch Controls ── */
-        #touchControls {
-            display: none;
-            position: fixed;
-            bottom: 20px;
-            left: 20px;
-            z-index: 40;
-            flex-direction: row;
-            gap: 80px;
-            align-items: center;
-        }
-        
-        @media (max-width: 768px) {
-            #touchControls {
-                display: flex;
-            }
-        }
-
-        #dpadContainer {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-
-        .touch-row {
-            display: flex;
-            gap: 8px;
-            justify-content: center;
-        }
-
-        #jumpContainer {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .touch-btn {
-            width: 50px;
-            height: 50px;
-            background: rgba(255, 215, 0, 0.3);
-            border: 2px solid #FFD700;
-            border-radius: 8px;
-            color: #FFD700;
-            font-size: 24px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            user-select: none;
-            transition: all 0.1s;
-            font-weight: bold;
-        }
-
-        .touch-btn:active {
-            background: rgba(255, 215, 0, 0.6);
-            transform: scale(0.95);
-        }
-
-        .touch-btn-hidden {
-            visibility: hidden;
-        }
-
-        #btnJump {
-            width: 80px;
-            height: 80px;
-            font-size: 16px;
-        }
     </style>
 </head>
 <body>
     <canvas id="gameCanvas" width="1280" height="720"></canvas>
-
-    <!-- Mobile Touch Controls -->
-    <div id="touchControls">
-        <div id="dpadContainer">
-            <div class="touch-row">
-                <div class="touch-btn touch-btn-hidden"></div>
-                <div class="touch-btn" id="btnUp">▲</div>
-                <div class="touch-btn touch-btn-hidden"></div>
-            </div>
-            <div class="touch-row">
-                <div class="touch-btn" id="btnLeft">◀</div>
-                <div class="touch-btn touch-btn-hidden"></div>
-                <div class="touch-btn" id="btnRight">▶</div>
-            </div>
-            <div class="touch-row">
-                <div class="touch-btn touch-btn-hidden"></div>
-                <div class="touch-btn" id="btnDown">▼</div>
-                <div class="touch-btn touch-btn-hidden"></div>
-            </div>
-        </div>
-        <div id="jumpContainer">
-            <div class="touch-btn" id="btnJump">JUMP</div>
-        </div>
-    </div>
 
     <!-- Save / Load Menu Overlay -->
     <div id="saveMenu">
@@ -370,30 +278,17 @@
             'd': new Image()  // Right
         };
 
-        playerSprites.s.src = 'miro.png';
-        playerSprites.w.src = 'miro.png';
-        playerSprites.a.src = 'miro.png';
-        playerSprites.d.src = 'miro.png';
+        playerSprites.s.src = 'players.png';
+        playerSprites.w.src = 'players.png';
+        playerSprites.a.src = 'players.png';
+        playerSprites.d.src = 'players.png';
 
         let currentPlayerSprite = playerSprites.s; // Default sprite
 
-        // Game state: 'menu' | 'character_selection' | 'playing'
+        // Game state: 'menu' | 'playing'
         let gameState = 'menu';
         let menuIndex = 0; // 0=New Game, 1=Load Game, 2=Quit
         const MENU_ITEMS = ['NEW GAME', 'LOAD GAME', 'QUIT'];
-
-        // ── Character Selection ────────────────────────────────────────
-        const CHARACTERS = ['miro','gono', 'nica', 'uriel', 'lemuel', 'markjean', 'annalyn', 'edrian', 'rance', 'shine', 'chauncey', 'jairene', 'ayra', 'reuben', 'mosot', 'judemeer'];
-        let characterIndex = 0;
-        let selectedCharacter = null;
-
-        // Load character portraits
-        const characterPortraits = {};
-        CHARACTERS.forEach(character => {
-            const portrait = new Image();
-            portrait.src = `portraits/${character}portrait.png`;
-            characterPortraits[character] = portrait;
-        });
 
         // ── Menu Music ───────────────────────────────────────────────
         let musicPlaying = false;
@@ -435,7 +330,7 @@
         const npcSprites = [];
         for (let i = 1; i <= 26; i++) {
             const sprite = new Image();
-            sprite.src = `npc/npc${i}.png`;
+            sprite.src = `npc${i}.png`;
             npcSprites.push(sprite);
         }
         
@@ -775,20 +670,6 @@
                 }
                 return;
             }
-            // ── Character selection navigation ─────────────────────────
-            if (gameState === 'character_selection') {
-                if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
-                    characterIndex = (characterIndex - 1 + CHARACTERS.length) % CHARACTERS.length;
-                } else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
-                    characterIndex = (characterIndex + 1) % CHARACTERS.length;
-                } else if (e.key === 'Enter') {
-                    handleCharacterSelect();
-                } else if (e.key === 'Escape') {
-                    gameState = 'menu';
-                    menuIndex = 0;
-                }
-                return;
-            }
             // ── In-game controls ──────────────────────────────────────
             if (e.key === 'F5') {
                 e.preventDefault();
@@ -804,57 +685,6 @@
         document.addEventListener('keyup', (e) => {
             if (keys.hasOwnProperty(e.key)) keys[e.key] = false;
         });
-
-        // ── Mobile Touch Controls ──────────────────────────────────────
-        function setupTouchControls() {
-            const touchBtnUp = document.getElementById('btnUp');
-            const touchBtnDown = document.getElementById('btnDown');
-            const touchBtnLeft = document.getElementById('btnLeft');
-            const touchBtnRight = document.getElementById('btnRight');
-            const touchBtnJump = document.getElementById('btnJump');
-
-            function handleTouchStart(e, key) {
-                e.preventDefault();
-                keys[key] = true;
-            }
-
-            function handleTouchEnd(e, key) {
-                e.preventDefault();
-                keys[key] = false;
-            }
-
-            // Up button
-            touchBtnUp.addEventListener('touchstart', (e) => handleTouchStart(e, 'w'));
-            touchBtnUp.addEventListener('touchend', (e) => handleTouchEnd(e, 'w'));
-            touchBtnUp.addEventListener('mousedown', (e) => handleTouchStart(e, 'w'));
-            touchBtnUp.addEventListener('mouseup', (e) => handleTouchEnd(e, 'w'));
-
-            // Down button
-            touchBtnDown.addEventListener('touchstart', (e) => handleTouchStart(e, 's'));
-            touchBtnDown.addEventListener('touchend', (e) => handleTouchEnd(e, 's'));
-            touchBtnDown.addEventListener('mousedown', (e) => handleTouchStart(e, 's'));
-            touchBtnDown.addEventListener('mouseup', (e) => handleTouchEnd(e, 's'));
-
-            // Left button
-            touchBtnLeft.addEventListener('touchstart', (e) => handleTouchStart(e, 'a'));
-            touchBtnLeft.addEventListener('touchend', (e) => handleTouchEnd(e, 'a'));
-            touchBtnLeft.addEventListener('mousedown', (e) => handleTouchStart(e, 'a'));
-            touchBtnLeft.addEventListener('mouseup', (e) => handleTouchEnd(e, 'a'));
-
-            // Right button
-            touchBtnRight.addEventListener('touchstart', (e) => handleTouchStart(e, 'd'));
-            touchBtnRight.addEventListener('touchend', (e) => handleTouchEnd(e, 'd'));
-            touchBtnRight.addEventListener('mousedown', (e) => handleTouchStart(e, 'd'));
-            touchBtnRight.addEventListener('mouseup', (e) => handleTouchEnd(e, 'd'));
-
-            // Jump button
-            touchBtnJump.addEventListener('touchstart', (e) => handleTouchStart(e, ' '));
-            touchBtnJump.addEventListener('touchend', (e) => handleTouchEnd(e, ' '));
-            touchBtnJump.addEventListener('mousedown', (e) => handleTouchStart(e, ' '));
-            touchBtnJump.addEventListener('mouseup', (e) => handleTouchEnd(e, ' '));
-        }
-
-        setupTouchControls();
 
         // Check collision for a single point (pixel coordinates)
         function checkCollisionPoint(x, y) {
@@ -1159,41 +989,21 @@
 
         // Handle menu selection
         function handleMenuSelect() {
+            stopMenuMusic();
             if (menuIndex === 0) {
-                // New Game — go to character selection (keep music playing)
-                gameState = 'character_selection';
-                characterIndex = 0;
+                // New Game
+                gameState = 'playing';
+                startPlayTimer();
+                document.getElementById('saveHint').style.display = 'block';
             } else if (menuIndex === 1) {
                 // Load Game — open the save overlay (loadSave will start the game)
-                stopMenuMusic();
                 openSaveMenu();
             } else if (menuIndex === 2) {
                 // Quit
-                stopMenuMusic();
                 window.close();
                 // Fallback message if window.close() is blocked
                 gameState = 'quit';
             }
-        }
-
-        // Load player sprite based on character name
-        function loadPlayerSprite(characterName) {
-            const spritePath = `sprites/${characterName}idle.png`;
-            playerSprites.s.src = spritePath;
-            playerSprites.w.src = spritePath;
-            playerSprites.a.src = spritePath;
-            playerSprites.d.src = spritePath;
-            currentPlayerSprite = playerSprites.s;
-        }
-
-        // Handle character selection
-        function handleCharacterSelect() {
-            selectedCharacter = CHARACTERS[characterIndex];
-            loadPlayerSprite(selectedCharacter);
-            stopMenuMusic();
-            gameState = 'playing';
-            startPlayTimer();
-            document.getElementById('saveHint').style.display = 'block';
         }
 
         // Canvas click → map to menu items
@@ -1353,93 +1163,6 @@
             ctx.textAlign = 'left';
         }
 
-        // Draw character selection screen
-        function drawCharacterSelection() {
-            const w = canvas.width;
-            const h = canvas.height;
-
-            // Background
-            if (startMenuBg.complete && startMenuBg.naturalWidth > 0) {
-                ctx.drawImage(startMenuBg, 0, 0, w, h);
-            } else {
-                const grad = ctx.createLinearGradient(0, 0, 0, h);
-                grad.addColorStop(0, '#0a0a1a');
-                grad.addColorStop(1, '#1a3a1a');
-                ctx.fillStyle = grad;
-                ctx.fillRect(0, 0, w, h);
-            }
-
-            // Title
-            ctx.textAlign = 'center';
-            ctx.shadowColor = '#FFD700';
-            ctx.shadowBlur = 28;
-            ctx.fillStyle = '#FFD700';
-            ctx.font = 'bold 60px "Courier New", monospace';
-            ctx.fillText('SELECT CHARACTER', w / 2, h * 0.15);
-
-            // Character display area
-            const displayWidth = 600;
-            const displayHeight = 300;
-            const displayX = (w - displayWidth) / 2;
-            const displayY = h * 0.3;
-
-            // Panel background
-            ctx.shadowBlur = 0;
-            ctx.fillStyle = 'rgba(8,16,34,0.88)';
-            ctx.strokeStyle = '#FFD700';
-            ctx.lineWidth = 3;
-            ctx.beginPath();
-            ctx.roundRect(displayX, displayY, displayWidth, displayHeight, 14);
-            ctx.fill();
-            ctx.stroke();
-
-            // Draw character portrait
-            const currentCharacter = CHARACTERS[characterIndex];
-            const portrait = characterPortraits[currentCharacter];
-            const portraitSize = 180; // 1:1 square size
-            const portraitX = (w - portraitSize) / 2;
-            const portraitY = displayY + 20;
-            
-            if (portrait && portrait.complete && portrait.naturalWidth > 0) {
-                ctx.drawImage(portrait, portraitX, portraitY, portraitSize, portraitSize);
-            }
-
-            // Current character name (large)
-            ctx.shadowBlur = 12;
-            ctx.shadowColor = '#FFD700';
-            ctx.fillStyle = '#FFD700';
-            ctx.font = 'bold 48px "Courier New", monospace';
-            ctx.textAlign = 'center';
-            ctx.fillText(CHARACTERS[characterIndex].toUpperCase(), w / 2, portraitY + portraitSize + 50);
-
-            // Character index indicator
-            ctx.shadowBlur = 0;
-            ctx.fillStyle = '#7799bb';
-            ctx.font = '16px "Courier New", monospace';
-            ctx.textAlign = 'center';
-            ctx.fillText(`${characterIndex + 1} / ${CHARACTERS.length}`, w / 2, portraitY + portraitSize + 80);
-
-            // Navigation hints
-            ctx.shadowBlur = 0;
-            ctx.fillStyle = '#334455';
-            ctx.font = '14px "Courier New", monospace';
-            ctx.textAlign = 'center';
-            ctx.fillText('← → / A D  NAVIGATE', w / 2, displayY + displayHeight - 40);
-            ctx.fillText('ENTER  CONFIRM     ESC  BACK', w / 2, displayY + displayHeight - 10);
-
-            // Show previous and next character names (dimmed)
-            const prevIdx = (characterIndex - 1 + CHARACTERS.length) % CHARACTERS.length;
-            const nextIdx = (characterIndex + 1) % CHARACTERS.length;
-
-            ctx.shadowBlur = 0;
-            ctx.fillStyle = 'rgba(119,153,187,0.5)';
-            ctx.font = '18px "Courier New", monospace';
-            ctx.textAlign = 'right';
-            ctx.fillText('◄ ' + CHARACTERS[prevIdx].toUpperCase(), displayX - 20, displayY + 100);
-            ctx.textAlign = 'left';
-            ctx.fillText(CHARACTERS[nextIdx].toUpperCase() + ' ►', displayX + displayWidth + 20, displayY + 100);
-        }
-
         // Draw "QUIT" screen if window.close() was blocked
         function drawQuitScreen() {
             ctx.fillStyle = '#000';
@@ -1460,8 +1183,6 @@
 
             if (gameState === 'menu') {
                 drawStartMenu();
-            } else if (gameState === 'character_selection') {
-                drawCharacterSelection();
             } else if (gameState === 'quit') {
                 drawQuitScreen();
             } else {
