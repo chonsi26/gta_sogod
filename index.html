@@ -763,6 +763,9 @@
             ' ': false // Spacebar for jump
         };
 
+        // Track previous key state for character selection mobile input
+        let prevCharSelectionKeys = { a: false, d: false, ' ': false };
+
         document.addEventListener('keydown', (e) => {
             // ── Main menu navigation ───────────────────────────────────
             if (gameState === 'menu') {
@@ -1461,6 +1464,22 @@
             if (gameState === 'menu') {
                 drawStartMenu();
             } else if (gameState === 'character_selection') {
+                // Handle mobile input for character selection
+                if (keys['a'] && !prevCharSelectionKeys['a']) {
+                    characterIndex = (characterIndex - 1 + CHARACTERS.length) % CHARACTERS.length;
+                }
+                if (keys['d'] && !prevCharSelectionKeys['d']) {
+                    characterIndex = (characterIndex + 1) % CHARACTERS.length;
+                }
+                if (keys[' '] && !prevCharSelectionKeys[' ']) {
+                    handleCharacterSelect();
+                }
+                
+                // Update previous key states
+                prevCharSelectionKeys['a'] = keys['a'];
+                prevCharSelectionKeys['d'] = keys['d'];
+                prevCharSelectionKeys[' '] = keys[' '];
+                
                 drawCharacterSelection();
             } else if (gameState === 'quit') {
                 drawQuitScreen();
